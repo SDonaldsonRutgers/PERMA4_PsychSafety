@@ -1,0 +1,388 @@
+---
+title: "Psych Safety"
+author: "Scott I. Donaldson, PhD"
+date: "01/21/2024"
+editor_options: 
+  chunk_output_type: console
+---
+```{r Packages}
+#Packages
+library(readxl)
+library(ggplot2)
+library(psych)
+library(freqdist)
+library(dplyr)
+library(tidyverse)
+library(broom)
+library(lavaan)
+library(Hmisc)
+library(ISLR)
+library(corrplot)
+library(lavaan)
+library(semTools)
+library(lmtest)
+library(car)
+library(interactions)
+library(ggplot2)
+```
+```{r Import data}
+library(haven)
+Validation_Study <- read_sav("~/Desktop/D&A/McQuaid/Research/Systems/DATA/PERMA4_Validation_Study.sav")
+
+library(readxl)
+Demos <- read_excel("~/Desktop/D&A/McQuaid/Research/Systems/DATA/Demos.xlsm")
+
+joined_data <- inner_join(Validation_Study, 
+                          Demos, 
+                          by="Prolific_ID")
+
+Final_DATA <- joined_data[-(1:3), ]
+
+```
+```{r Variable recodes}
+#Language Recode
+Final_DATA$Language_Recode[Final_DATA$Language=="English"] <- "English"
+
+Final_DATA$Language_Recode[is.na(Final_DATA$Language_Recode)] <- "Non_English"
+
+#Workgroups Recode
+Final_DATA$Workgroups_Recode[Final_DATA$Workgroups=="I sometimes work as part of a group and sometimes alone, I work as part of a small group 2-10"] <- "I work as part of a small group 2-10"
+
+Final_DATA$Workgroups_Recode[Final_DATA$Workgroups=="I work as part of a small group 2-10"] <- "I work as part of a small group 2-10"
+
+Final_DATA$Workgroups_Recode[is.na(Final_DATA$Workgroups_Recode)] <- "I work as part of a large group 10+ "
+
+
+
+```
+#Descriptives
+```{r Descriptives}
+#PERMA4_Individual
+mean(Final_DATA$PERMA4_Score_I)
+sd(Final_DATA$PERMA4_Score_I)
+skew(Final_DATA$PERMA4_Score_I)
+kurtosis(Final_DATA$PERMA4_Score_I)
+
+#PERMA4_Team
+mean(Final_DATA$PERMA4_Score_T)
+sd(Final_DATA$PERMA4_Score_T)
+skew(Final_DATA$PERMA4_Score_T)
+kurtosis(Final_DATA$PERMA4_Score_T)
+
+#Psych Safety Leader Individual
+mean(Final_DATA$Leader_PS_Ind_Score)
+sd(Final_DATA$Leader_PS_Ind_Score)
+skew(Final_DATA$Leader_PS_Ind_Score)
+kurtosis(Final_DATA$Leader_PS_Ind_Score)
+
+#Psych Safety Leader Team
+mean(Final_DATA$Leader_PS_Team_Score)
+sd(Final_DATA$Leader_PS_Team_Score)
+skew(Final_DATA$Leader_PS_Team_Score)
+kurtosis(Final_DATA$Leader_PS_Team_Score)
+
+#JAWS Positive
+mean(Final_DATA$JAWS_PositiveEmotion_Score)
+sd(Final_DATA$JAWS_PositiveEmotion_Score)
+skew(Final_DATA$JAWS_PositiveEmotion_Score)
+kurtosis(Final_DATA$JAWS_PositiveEmotion_Score)
+
+#JAWS Negative
+mean(Final_DATA$JAWS_NegativeEmotion_Score)
+sd(Final_DATA$JAWS_NegativeEmotion_Score)
+skew(Final_DATA$JAWS_NegativeEmotion_Score)
+kurtosis(Final_DATA$JAWS_NegativeEmotion_Score)
+
+#Job Stress
+mean(Final_DATA$JobStress_Score)
+sd(Final_DATA$JobStress_Score)
+skew(Final_DATA$JobStress_Score)
+kurtosis(Final_DATA$JobStress_Score)
+
+#Team Proficiency
+mean(Final_DATA$Proficiency_T_Score,
+     na.rm = TRUE)
+sd(Final_DATA$Proficiency_T_Score,
+     na.rm = TRUE)
+skew(Final_DATA$Proficiency_T_Score)
+kurtosis(Final_DATA$Proficiency_T_Score)
+
+#Team Adapt
+mean(Final_DATA$Adapt_T_Score,
+     na.rm = TRUE)
+sd(Final_DATA$Adapt_T_Score,
+     na.rm = TRUE)
+skew(Final_DATA$Adapt_T_Score)
+kurtosis(Final_DATA$Adapt_T_Score)
+
+#Team Proact
+mean(Final_DATA$Proact_T_Score,
+     na.rm = TRUE)
+sd(Final_DATA$Proact_T_Score,
+     na.rm = TRUE)
+skew(Final_DATA$Proact_T_Score)
+kurtosis(Final_DATA$Proact_T_Score)
+
+```
+
+
+#Cronbach's Alpha
+```{r PERMA+4}
+#PERMA4
+PERMA4_I_Alpha <- Final_DATA[, c(12:20)]
+alpha(PERMA4_I_Alpha)
+
+PERMA4_T_Alpha <- Final_DATA[, c(22:30)]
+alpha(PERMA4_T_Alpha)
+
+#Leader Psych Safety
+PS_I_Alpha <- Final_DATA[, c(133,136,137,139,143)]
+alpha(PS_I_Alpha)
+
+PS_T_Alpha <- Final_DATA[, c(134,135,138,141,144)]
+alpha(PS_T_Alpha)
+
+#JAWS
+#Positive
+JAWS_P_Alpha <- Final_DATA[, c(42,44,45,49:52,57:59)]
+alpha(JAWS_P_Alpha)
+
+JAWS_N_Alpha <- Final_DATA[, c(40,41,43,46,47,48,53,54,55,56)]
+alpha(JAWS_N_Alpha)
+
+#Job Stress
+Stress_Alpha <- Final_DATA[, c(70,71,72,74,75)]
+alpha(Stress_Alpha)
+
+#Work Role Performance
+#Team Proficiency
+TP_Alpha <- Final_DATA[, c(90:92)]
+alpha(TP_Alpha)
+
+#Team Adapt
+TA_Alpha <- Final_DATA[, c(99:101)]
+alpha(TA_Alpha)
+
+#Team Pro
+TPro_Alpha <- Final_DATA[, c(108:110)]
+alpha(TPro_Alpha)
+
+
+```
+#Individual-Level
+```{r PERMA4(I) + Psych Safety}
+JAWS_P <- lm(JAWS_PositiveEmotion_Score ~ PERMA4_Score_I * Leader_PsychSafety_Ind, 
+            Final_DATA)
+summary(JAWS_P)
+
+#JAWS Negative
+JAWS_N <- lm(JAWS_NegativeEmotion_Score ~ PERMA4_Score_I * Leader_PsychSafety_Ind, 
+            Final_DATA)
+summary(JAWS_N)
+
+#JobStress
+JobStress <- lm(JobStress_Score ~ PERMA4_Score_I * Leader_PsychSafety_Ind, 
+            Final_DATA)
+summary(JobStress)
+```
+```{r PERMA4(I) + Strengths}
+JAWS_P <- lm(JAWS_PositiveEmotion_Score ~ PERMA4_Score_I * Leader_Strengths_Ind, 
+            Final_DATA)
+summary(JAWS_P)
+
+#JAWS Negative
+JAWS_N <- lm(JAWS_NegativeEmotion_Score ~ PERMA4_Score_I * Leader_Strengths_Ind, 
+            Final_DATA)
+summary(JAWS_N)
+
+#JobStress
+JobStress <- lm(JobStress_Score ~ PERMA4_Score_I * Leader_Strengths_Ind, 
+            Final_DATA)
+summary(JobStress)
+
+
+
+
+```
+```{r PERMA4(I) + Appreciate}
+JAWS_P <- lm(JAWS_PositiveEmotion_Score ~ PERMA4_Score_I * Leader_Appreciate_Ind, 
+            Final_DATA)
+summary(JAWS_P)
+
+#JAWS Negative
+JAWS_N <- lm(JAWS_NegativeEmotion_Score ~ PERMA4_Score_I * Leader_Appreciate_Ind, 
+            Final_DATA)
+summary(JAWS_N)
+
+#JobStress
+JobStress <- lm(JobStress_Score ~ PERMA4_Score_I * Leader_Appreciate_Ind, 
+            Final_DATA)
+summary(JobStress)
+
+```
+```{r PERMA4(I) + Emotions}
+JAWS_P <- lm(JAWS_PositiveEmotion_Score ~ PERMA4_Score_I * Leader_Emotions_Ind, 
+            Final_DATA)
+summary(JAWS_P)
+
+#JAWS Negative
+JAWS_N <- lm(JAWS_NegativeEmotion_Score ~ PERMA4_Score_I * Leader_Emotions_Ind, 
+            Final_DATA)
+summary(JAWS_N)
+
+#JobStress
+JobStress <- lm(JobStress_Score ~ PERMA4_Score_I * Leader_Emotions_Ind, 
+            Final_DATA)
+summary(JobStress)
+
+```
+```{r PERMA4(I) + Meaning}
+JAWS_P <- lm(JAWS_PositiveEmotion_Score ~ PERMA4_Score_I * Leader_Meaning_Ind, 
+            Final_DATA)
+summary(JAWS_P)
+
+#JAWS Negative
+JAWS_N <- lm(JAWS_NegativeEmotion_Score ~ PERMA4_Score_I * Leader_Meaning_Ind, 
+            Final_DATA)
+summary(JAWS_N)
+
+#JobStress
+JobStress <- lm(JobStress_Score ~ PERMA4_Score_I * Leader_Meaning_Ind, 
+            Final_DATA)
+summary(JobStress)
+
+```
+```{r PERMA4(I) + Psych Safety I Scale}
+JAWS_P <- lm(JAWS_PositiveEmotion_Score ~ PERMA4_Score_I * Leader_PS_Ind_Score, 
+            Final_DATA)
+summary(JAWS_P)
+confint(JAWS_P)
+
+#JAWS Negative
+JAWS_N <- lm(JAWS_NegativeEmotion_Score ~ PERMA4_Score_I * Leader_PS_Ind_Score, 
+            Final_DATA)
+summary(JAWS_N)
+confint(JAWS_N)
+
+
+#JobStress
+JobStress <- lm(JobStress_Score ~ PERMA4_Score_I * Leader_PS_Ind_Score, 
+            Final_DATA)
+summary(JobStress)
+confint(JobStress)
+```
+#Team-Level
+```{r PERMA4(T) + Support}
+Prof_T <- lm(Proficiency_T_Score ~ PERMA4_Score_T * Leader_Support_Team, 
+            Final_DATA)
+summary(Prof_T)
+
+#Adapt Team
+Adapt_T <- lm(JAWS_NegativeEmotion_Score ~ PERMA4_Score_T * Leader_Support_Team, 
+            Final_DATA)
+summary(Adapt_T)
+
+#Proact Team
+Proact_T <- lm(JobStress_Score ~ PERMA4_Score_T * Leader_Support_Team, 
+            Final_DATA)
+summary(Proact_T)
+
+
+
+```
+```{r PERMA4(T) + Trust}
+
+Prof_T <- lm(Proficiency_T_Score ~ PERMA4_Score_T * Leader_Trust_Team, 
+            Final_DATA)
+summary(Prof_T)
+
+#Adapt Team
+Adapt_T <- lm(JAWS_NegativeEmotion_Score ~ PERMA4_Score_T * Leader_Trust_Team, 
+            Final_DATA)
+summary(Adapt_T)
+
+#Proact Team
+Proact_T <- lm(JobStress_Score ~ PERMA4_Score_T * Leader_Trust_Team, 
+            Final_DATA)
+summary(Proact_T)
+
+
+
+```
+```{r PERMA4(T) + Appreciate}
+Prof_T <- lm(Proficiency_T_Score ~ PERMA4_Score_T * Leader_Appreciate_Team, 
+            Final_DATA)
+summary(Prof_T)
+
+#Adapt Team
+Adapt_T <- lm(JAWS_NegativeEmotion_Score ~ PERMA4_Score_T * Leader_Appreciate_Team, 
+            Final_DATA)
+summary(Adapt_T)
+
+#Proact Team
+Proact_T <- lm(JobStress_Score ~ PERMA4_Score_T * Leader_Appreciate_Team, 
+            Final_DATA)
+summary(Proact_T)
+
+
+
+```
+```{r PERMA4(T) + Responsibility}
+Prof_T <- lm(Proficiency_T_Score ~ PERMA4_Score_T * Leader_Responsibility_Team, 
+            Final_DATA)
+summary(Prof_T)
+
+#Adapt Team
+Adapt_T <- lm(JAWS_NegativeEmotion_Score ~ PERMA4_Score_T * Leader_Responsibility_Team, 
+            Final_DATA)
+summary(Adapt_T)
+
+#Proact Team
+Proact_T <- lm(JobStress_Score ~ PERMA4_Score_T * Leader_Responsibility_Team, 
+            Final_DATA)
+summary(Proact_T)
+
+```
+```{r PERMA4(T) + Struggles}
+Prof_T <- lm(Proficiency_T_Score ~ PERMA4_Score_T * Leader_Struggles_Team, 
+            Final_DATA)
+summary(Prof_T)
+
+#Adapt Team
+Adapt_T <- lm(JAWS_NegativeEmotion_Score ~ PERMA4_Score_T * Leader_Struggles_Team, 
+            Final_DATA)
+summary(Adapt_T)
+
+#Proact Team
+Proact_T <- lm(JobStress_Score ~ PERMA4_Score_T * Leader_Struggles_Team, 
+            Final_DATA)
+summary(Proact_T)
+
+```
+```{r PERMA4(T) + Psych Safety T Scale}
+Prof_T <- lm(Proficiency_T_Score ~ PERMA4_Score_T * Leader_PS_Team_Score, 
+            Final_DATA)
+summary(Prof_T)
+confint(Prof_T)
+
+#Adapt Team
+Adapt_T <- lm(Adapt_T_Score ~ PERMA4_Score_T * Leader_PS_Team_Score, 
+            Final_DATA)
+summary(Adapt_T)
+confint(Adapt_T)
+
+#Proact Team
+Proact_T <- lm(Proact_T_Score ~ PERMA4_Score_T * Leader_PS_Team_Score, 
+            Final_DATA)
+summary(Proact_T)
+confint(Proact_T)
+```
+
+
+
+
+
+
+
+
+
